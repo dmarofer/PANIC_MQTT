@@ -7,7 +7,7 @@ Desarrollado con Visual Code + PlatformIO en Framework Arduino
 Implementa las comunicaciones WIFI y MQTT asi como la configuracion de las mismas via comandos
 Implementa el envio de comandos via puerto serie o MQTT
 Implementa el uso de tareas para multiproceso con la libreria TaskScheduler
-Incluye la clase MiProyecto para desarrollar nuestro proyecto.
+Incluye la clase Panic para desarrollar nuestro proyecto.
 Author: Diego Maroto - BilbaoMakers 2020 - info@bilbaomakers.org - dmarofer@diegomaroto.net
 
 https://github.com/bilbaomakers/ESP8266MQTTBASE
@@ -29,7 +29,7 @@ Licencia: GNU General Public License v3.0 ( mas info en GitHub )
 #include <TaskScheduler.h>				// Task Scheduler
 #include <cppQueue.h>					// Libreria para uso de colas.
 #include <ConfigCom.h>					// Para la gestion de la configuracion de las comunicaciones.
-#include <MiProyecto.h>					// Clase de Mi Proyecto
+#include <Panic.h>						// Clase de Mi Proyecto
 #include <ESP8266WiFi.h>				// Para la gestion de la Wifi
 #include <AsyncMqttClient.h>			// Vamos a probar esta que es Asincrona: https://github.com/marvinroger/async-mqtt-client
 #include <FS.h>							// Libreria Sistema de Ficheros
@@ -38,6 +38,7 @@ Licencia: GNU General Public License v3.0 ( mas info en GitHub )
 #include <NTPClient.h>					// Para la gestion de la hora por NTP
 #include <WiFiUdp.h>					// Para la conexion UDP con los servidores de hora.
 #include <ArduinoOTA.h>					// Actualizaciones de firmware por red.
+#include <Configuracion.h>				// Fichero de configuracion
 
 // Tipo de cola (lib cppQueue)
 #define	IMPLEMENTATION	LIFO
@@ -51,19 +52,6 @@ Licencia: GNU General Public License v3.0 ( mas info en GitHub )
 //#define _TASK_PRIORITY          // Support for layered scheduling priority
 //#define _TASK_MICRO_RES       // Support for microsecond resolutionMM
 //#define _TASK_DEBUG
-
-#pragma endregion
-
-#pragma region Constantes y configuracion. Modificable aqui por el usuario
-
-// Para el nombre del fichero de configuracion de comunicaciones
-static const String FICHERO_CONFIG_COM = "/MiProyectoCom.json";
-
-// Para el nombre del fichero de configuracion del proyecto
-static const String FICHERO_CONFIG_PRJ = "/MiProyectoCfg.json";
-
-// Para la zona horaria (horas de diferencia con UTC)
-static const int HORA_LOCAL = 2;
 
 #pragma endregion
 
@@ -90,8 +78,8 @@ static NTPClient ClienteNTP(UdpNtp, "pool.ntp.org", HORA_LOCAL * 3600, 3600);
 // Para el manejador de ficheros de configuracion
 ConfigCom MiConfig = ConfigCom(FICHERO_CONFIG_COM);
 
-// Objeto de la clase MiProyecto.
-MiProyecto MiProyectoOBJ(FICHERO_CONFIG_PRJ, ClienteNTP);
+// Objeto de la clase Panic.
+Panic MiPanic(FICHERO_CONFIG_PRJ, ClienteNTP);
 
 // Task Scheduler
 Scheduler MiTaskScheduler;
@@ -169,7 +157,7 @@ void onMqttConnect(bool sessionPresent) {
 	else{
 
 		// Si todo ha ido bien, proceso de inicio terminado.
-		MiProyectoOBJ.ComOK = true;
+		MiPanic.ComOK = true;
 		Serial.print("** ");
 		Serial.print(ClienteNTP.getFormattedTime());
 		Serial.println(" - SISTEMA INICIADO CORRECTAMENTE **");
@@ -238,7 +226,7 @@ void onMqttPublish(uint16_t packetId) {
 
 }
 
-// Manda a la cola de respuestas el mensaje de respuesta. Esta funcion la uso como CALLBACK para el objeto MiProyecto
+// Manda a la cola de respuestas el mensaje de respuesta. Esta funcion la uso como CALLBACK para el objeto Panic
 void MandaRespuesta(String comando, String payload) {
 
 			String t_topic = MiConfig.statTopic + "/" + comando;
@@ -274,7 +262,7 @@ void MandaTelemetria() {
 			ObjJson.set("TIPO","MQTT");
 			ObjJson.set("CMND","TELE");
 			ObjJson.set("MQTTT",t_topic);
-			ObjJson.set("RESP",MiProyectoOBJ.MiEstadoJson(1));
+			ObjJson.set("RESP",MiPanic.MiEstadoJson(1));
 			
 			char JSONmessageBuffer[300];
 			ObjJson.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
@@ -396,6 +384,29 @@ void TaskProcesaComandos (){
 						Serial.println("MQTTTopic <string> - Nombre para la jerarquia de los topics MQTT");
 						Serial.println("SaveCom - Salvar la configuracion en el microcontrolador");
 						
+					}
+
+					else if (COMANDO == "Avisar"){
+
+						
+						if (PAYLOAD == "WARNING"){
+
+							MiPanic.Avisar(Panic::TipoCategoriaAviso::AVISO_WARNING);
+
+						}
+
+						else if (PAYLOAD == "EMERGENCIA"){
+
+							MiPanic.Avisar(Panic::TipoCategoriaAviso::AVISO_EMERGENCIA);
+						
+						}
+
+						else if (PAYLOAD == "CUMPLE"){
+
+							MiPanic.Avisar(Panic::TipoCategoriaAviso::AVISO_CUMPLE);
+						
+						}
+
 					}
 
 					// Y Ya si no es de ninguno de estos ....
@@ -561,10 +572,10 @@ void TaskComandosSerieRun(){
 }
 
 // Tarea para el metodo run del objeto de la cupula.
-void TaskMiProyectoRun(){
+void TaskPanicRun(){
 
 
-		MiProyectoOBJ.Run();
+		MiPanic.RunFast();
 
 
 }
@@ -584,7 +595,7 @@ void TaskMandaTelemetria(){
 
 Task TaskProcesaComandosHandler (100, TASK_FOREVER, &TaskProcesaComandos, &MiTaskScheduler, false);
 Task TaskEnviaRespuestasHandler (100, TASK_FOREVER, &TaskEnviaRespuestas, &MiTaskScheduler, false);
-Task TaskMiProyectoRunHandler (100, TASK_FOREVER, &TaskMiProyectoRun, &MiTaskScheduler, false);
+Task TaskPanicRunHandler (100, TASK_FOREVER, &TaskPanicRun, &MiTaskScheduler, false);
 Task TaskMandaTelemetriaHandler (5000, TASK_FOREVER, &TaskMandaTelemetria, &MiTaskScheduler, false);
 Task TaskComandosSerieRunHandler (100, TASK_FOREVER, &TaskComandosSerieRun, &MiTaskScheduler, false);
 Task TaskGestionRedHandler (4000, TASK_FOREVER, &TaskGestionRed, &MiTaskScheduler, false);	
@@ -602,10 +613,10 @@ void setup() {
 	Serial.begin(115200);
 	Serial.println();
 
-	Serial.println("-- Iniciando Controlador MiProyecto --");
+	Serial.println("-- Iniciando Controlador Panic --");
 
 	// Asignar funciones Callback
-	MiProyectoOBJ.SetRespondeComandoCallback(MandaRespuesta);
+	MiPanic.SetRespondeComandoCallback(MandaRespuesta);
 		
 	// Comunicaciones
 	ClienteMQTT = AsyncMqttClient();
@@ -633,7 +644,7 @@ void setup() {
   			ClienteMQTT.onPublish(onMqttPublish);
   			ClienteMQTT.setServer(MiConfig.mqttserver, 1883);
 			ClienteMQTT.setCleanSession(true);
-			ClienteMQTT.setClientId("MiProyecto");
+			ClienteMQTT.setClientId("Panic");
 			ClienteMQTT.setCredentials(MiConfig.mqttusuario,MiConfig.mqttpassword);
 			ClienteMQTT.setKeepAlive(4);
 			ClienteMQTT.setWill(MiConfig.lwtTopic.c_str(),2,true,"Offline");
@@ -644,8 +655,8 @@ void setup() {
 	
 		}
 
-		// Leer configuracion salvada del Objeto MiProyectoOBJ
-		MiProyectoOBJ.LeeConfig();
+		// Leer configuracion salvada del Objeto MiPanic
+		MiPanic.LeeConfig();
 
 	}
 
@@ -661,13 +672,15 @@ void setup() {
 		
 	TaskProcesaComandosHandler.enable();
 	TaskEnviaRespuestasHandler.enable();
-	TaskMiProyectoRunHandler.enable();
+	TaskPanicRunHandler.enable();
 	TaskMandaTelemetriaHandler.enable();
 	TaskComandosSerieRunHandler.enable();
 	
 	// Init Completado.
 	Serial.println("Setup Completado.");
-	
+
+	MiPanic.Avisar(Panic::TipoCategoriaAviso::AVISO_INICIO);
+		
 }
 
 #pragma endregion
@@ -681,8 +694,8 @@ void loop() {
 
 	ArduinoOTA.handle();
 	MiTaskScheduler.execute();
-	ClienteNTP.update();
-
+	if (ClienteNTP.update()){MiPanic.SetBootTime(ClienteNTP.getFormattedTime());}
+	
 }
 
 #pragma endregion
