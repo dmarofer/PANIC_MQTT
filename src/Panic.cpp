@@ -9,19 +9,17 @@
 #include <IndicadorLed.h>
 #include <Pulsador.h>
 
-Pulsador Botonazo (PINPULSADOR, INPUT_PULLUP, DEBOUNCEBOTONAZO, HOLDTIMEBOTONAZO, false);
-IndicadorLed LedBotonazo(PINLED, false);
+Pulsador Botonazo (PINPULSADOR, INPUT, DEBOUNCEBOTONAZO, HOLDTIMEBOTONAZO, false);
+IndicadorLed LedBotonazo(PINLED, false, PINBUZZER);
 
 Panic::Panic(String fich_config_Panic, NTPClient& ClienteNTP) : ClienteNTP(ClienteNTP) {
 
     HardwareInfo = "Panic-1.0b";
-	ComOK = false;
 	HayQueSalvar = false;
 	mificheroconfig = fich_config_Panic;
 	CategoriaAviso = Panic::AVISO_INICIO;
 	BootTime = "NA";
-	pinMode(PINBUZZER, OUTPUT);
-    	
+	   	
 
 }
 
@@ -50,7 +48,7 @@ String Panic::MiEstadoJson(int categoria) {
 		jObj.set("BOOT", BootTime);										// HORA de arranque del sistema
 		jObj.set("HI", HardwareInfo);									// Info del Hardware
 		jObj.set("UPT", t_uptime);										// Uptime en segundos
-		jObj.set("CS", ComOK);											// Info de la conexion WIFI y MQTT
+		jObj.set("SWITCH", Botonazo.LeeEstado());						// Info de la conexion WIFI y MQTT
 		jObj.set("RC", rtc_info->reason);								// Reset Cause (0=POWER ON, 1=WTD reset, 4=SOFTWARE RESET, 6=BOTON RESET, )
 		jObj.set("RR", ESP.getResetReason());							// Reset Reason
 
@@ -154,33 +152,100 @@ void Panic::Avisar(TipoCategoriaAviso t_CategoriaAviso){
 
 		case AVISO_INICIO:
 
-			LedBotonazo.Pulsos(1000,1000,4);
-			//tone(PINBUZZER,1000,50);
-			
+			LedBotonazo.SetFrecuencia(1000);
+			LedBotonazo.Pulsos(50,50,2);
+									
 		break;
 		
 		case AVISO_WARNING:
 
-			LedBotonazo.Pulsos(200,500,3);
+			LedBotonazo.SetFrecuencia(300);
+			LedBotonazo.Pulsos(500,500,3);
 
 		break;
 		
 		case AVISO_EMERGENCIA:
 
-			LedBotonazo.Pulsos(100,100,5);
+			LedBotonazo.SetFrecuencia(300);
+			LedBotonazo.Pulsos(200,200,15);
 
 		break;
 
 		case AVISO_CUMPLE:
 
-			// Luego haremos un juego de luces junto con el sonido
-			LedBotonazo.Pulsos(2000,2000,4);
+			LedBotonazo.Encender();
+			this->Cumple();
+			LedBotonazo.Apagar();
+			LedBotonazo.Ciclo(200,200,8000,NAvisos);
 
 		break;
 		
 		
 	}
 
+
+}
+
+void Panic::Cumple(){
+
+	tone(PINBUZZER,c,150*2); 
+	delay(200*2); 
+	tone(PINBUZZER,c,50*2); 
+	delay(50*2); 
+	tone(PINBUZZER,d,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,c,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,f,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,e,half); 
+	delay(half); 
+	tone(PINBUZZER,c,150*2); 
+	delay(200*2); 
+	tone(PINBUZZER,c,50*2); 
+	delay(50*2); 
+	tone(PINBUZZER,d,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,c,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,g,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,f,half); 
+	delay(half); 
+	tone(PINBUZZER,c,150*2); 
+	delay(200*2); 
+	tone(PINBUZZER,c,50*2); 
+	delay(50*2); 
+	tone(PINBUZZER,highc,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,a,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,f,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,e,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,d,half); 
+	delay(half); 
+	tone(PINBUZZER,Bb,150*2); 
+	delay(200*2); 
+	tone(PINBUZZER,Bb,50*2); 
+	delay(50*2); 
+	tone(PINBUZZER,a,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,f,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,g,quarter); 
+	delay(quarter); 
+	tone(PINBUZZER,f,half); 
+	delay(half);
+
+}
+
+void Panic::SetNAvisos(int l_NAvisos){
+
+	NAvisos = l_NAvisos;
+	LedBotonazo.Apagar();
+	LedBotonazo.Ciclo(200,200,8000,NAvisos);
 
 }
 
@@ -191,6 +256,20 @@ void Panic::RunFast() {
 	t_uptime = 0;
 	LedBotonazo.RunFast();
 	Botonazo.Run();
+
+	switch (Botonazo.LeeEstado())
+	{
+	case Pulsador::EDB_PULSADO:
+		
+		this->Avisar(Panic::AVISO_EMERGENCIA);
+		this->MiRespondeComandos("SWITCH", "1");
+
+	break;
+	
+	default:
+	break;
+	
+	}
 	
 	if (HayQueSalvar){
 

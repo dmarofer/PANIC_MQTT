@@ -46,15 +46,11 @@ private:
 	int eighth = 500/2;
 	int quarter = 1000/2;
 	int half = 2000/2; 
-   
-	// 	#####################################################################################################################################
-	//  ## DECLARACIONES
-	// 	#####################################################################################################################################
 
-	unsigned long platido = 1; 		// Latido cada estos MINUTOS
-	unsigned long tlatido = 0;		// Temporal para el millis del ultimo latido
-	unsigned long t_boton = 0;		// Para almacenar el tiempo pulsado del boton.
-    
+	int NAvisos;
+
+	void Cumple();
+	    
 public:
 
 	enum TipoCategoriaAviso {
@@ -72,9 +68,7 @@ public:
 
     //  Variables Publicas
 	String HardwareInfo;											// Identificador del HardWare y Software
-	bool ComOK;														// Si la wifi y la conexion MQTT esta OK
 	
-
 	// Funciones Publicas
 	String MiEstadoJson(int categoria);								// Devuelve un JSON con los estados en un array de 100 chars (la libreria MQTT no puede con mas de 100)
 	
@@ -83,6 +77,8 @@ public:
 	boolean SalvaConfig();
 
 	void SetBootTime(String l_BootTime);
+
+	void SetNAvisos(int l_NAvisos);
 
 	void Avisar(TipoCategoriaAviso t_CategoriaAviso);													// Funcion para ejecutar en el Setup e inicializar el objeto
 	void RunFast();													// Actualiza las propiedades de estado de este objeto en funcion del estado de motores y sensores

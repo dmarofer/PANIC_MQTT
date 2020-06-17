@@ -23,6 +23,10 @@ private:
     
     bool Invertir;
 
+    int PinBuzzer;
+    bool BuzzerPresent;
+
+    int FrecuenciaTono;
 
 public:
 
@@ -37,10 +41,12 @@ public:
     }EstadoLed, EstadoLedCiclos;
 
     IndicadorLed(int l_pin, bool l_Invertir);
+    IndicadorLed(int l_pin, bool l_Invertir, int l_pinBuzzer);
     ~IndicadorLed(){};
 
     void Pulsos(unsigned int l_TiempoONPulso, unsigned int l_TiempoOFFPulso, unsigned int l_NumeroPulsos);
     void Ciclo(unsigned int l_TiempoONPulso, unsigned int l_TiempoOFFPulso, unsigned int l_TiempoCiclo, unsigned int l_NumeroPulsos);
+    void SetFrecuencia(int l_frecuenciaTono);
     void Encender();
     void Apagar();
 

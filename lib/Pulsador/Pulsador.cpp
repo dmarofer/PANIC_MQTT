@@ -10,8 +10,14 @@ Licencia: GNU General Public License v3.0 - https://www.gnu.org/licenses/gpl-3.0
 
 */
 
+
 #include <Pulsador.h>
 #include "Arduino.h"
+
+// Todo: Implementar si quieres que escupa el estado al apretar o al soltar, y elegir en el constructor
+// - Para finales de carrera al apretar, y hold cuando pasa el tiempo de hold (lo que hace ahora)
+// - Para usuario es mejor al soltar para solo hacer la accion que sea.
+// - Implementar devolver el tiempo de hold tambien.
 
 
 Pulsador::Pulsador(int pin, int modo, unsigned long DebounceTimeMS, unsigned long HoldTimeMS, bool invert){
@@ -94,8 +100,14 @@ void Pulsador::Run(){
 				Estado_Salida = EDB_IDLE;
 
 			}
+
+		break;
+		
+		default:
+		break;
+
 	
-		}
+	}
 
-
+		
 }

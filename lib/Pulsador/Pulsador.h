@@ -23,7 +23,7 @@ private:
     int pinswitch;
 
     bool invertir;
-
+    
 public:
 
     enum Estado_Salida {

@@ -3,7 +3,7 @@
 #include "Arduino.h"
 
 
-IndicadorLed::IndicadorLed(int l_pin, bool t_Invertir){
+IndicadorLed::IndicadorLed(int l_pin, bool l_Invertir){
 
     this->pin=l_pin;
     pinMode(pin, OUTPUT);
@@ -20,7 +20,33 @@ IndicadorLed::IndicadorLed(int l_pin, bool t_Invertir){
     CuentaMillisPulso=millis();
     CuentaMillisCiclo=millis();
     CuentaPulsos = 0;
-    Invertir = t_Invertir;
+    Invertir = l_Invertir;
+    BuzzerPresent = false;
+
+}
+
+IndicadorLed::IndicadorLed(int l_pin, bool l_Invertir, int l_pinBuzzer){
+
+    this->pin=l_pin;
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW ^ Invertir);
+    EstadoLed = LED_APAGADO;
+    EstadoLedCiclos = LED_APAGADO;
+    TiempoONPulso = 200;
+    TiempoOFFPulso = 1000;
+    NumeroPulsos = 1;
+    TiempoONCiclo = 200;
+    TiempoOFFCiclo = 1000;
+    TiempoCiclo = 5000;
+    NumeroPulsosCiclo = 1;
+    CuentaMillisPulso=millis();
+    CuentaMillisCiclo=millis();
+    CuentaPulsos = 0;
+    Invertir = l_Invertir;
+    PinBuzzer = l_pinBuzzer;
+    BuzzerPresent = true;
+    pinMode(PinBuzzer, OUTPUT);
+    FrecuenciaTono = 1000;
 
 }
 
@@ -64,6 +90,12 @@ void IndicadorLed::Apagar(){
 
 }
 
+void IndicadorLed::SetFrecuencia(int l_frecuenciaTono){
+
+    FrecuenciaTono=l_frecuenciaTono;
+
+}
+
 void IndicadorLed::RunFast(){
 
 
@@ -96,6 +128,7 @@ void IndicadorLed::RunFast(){
                     
                     digitalWrite(pin, HIGH ^ Invertir);      // ENCENDER
                     CuentaMillisPulso = millis();                // ACTUALIZAR EL TIEMPO DEL CONTADOR
+                    if (BuzzerPresent){tone(PinBuzzer,FrecuenciaTono,TiempoONPulso);}
                     EstadoLed = LED_PULSO_ON;                // PASAR A ESTE ESTADO QUE HARA OTRO CICLO
 
                 }
@@ -136,6 +169,7 @@ void IndicadorLed::RunFast(){
 
         if ((millis() - CuentaMillisCiclo) > TiempoCiclo){
 
+            this->SetFrecuencia(0);
             this->Pulsos(TiempoONCiclo, TiempoOFFCiclo, NumeroPulsosCiclo);
             CuentaMillisCiclo = millis();
 
