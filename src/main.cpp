@@ -31,9 +31,9 @@ Licencia: GNU General Public License v3.0 - https://www.gnu.org/licenses/gpl-3.0
 #pragma region Objetos
 
 // Manejadores Colas para comunicaciones inter-tareas
-Queue ColaComandos(300, 10, IMPLEMENTATION);	// Cola para los comandos recibidos
-Queue ColaTelemetria(300, 10, IMPLEMENTATION);	// Cola para la telemetria recibida
-Queue ColaRespuestas(300, 10, IMPLEMENTATION);	// Cola para las respuestas a enviar
+Queue ColaComandos(200, 10, IMPLEMENTATION);	// Cola para los comandos recibidos
+Queue ColaTelemetria(200, 10, IMPLEMENTATION);	// Cola para la telemetria recibida
+Queue ColaRespuestas(300, 20, IMPLEMENTATION);	// Cola para las respuestas a enviar
 
 // Flag para el estado del sistema de ficheros
 boolean SPIFFStatus = false;
@@ -71,9 +71,9 @@ void WiFiEventCallBack(WiFiEvent_t event) {
       	  	Serial.println(WiFi.localIP());
 			ArduinoOTA.begin();
 			Serial.println("Proceso OTA arrancado.");
-			ClienteNTP.begin();
 			MisComunicaciones.Conectar();
-        	break;
+			ClienteNTP.begin();
+			break;
     	case WIFI_EVENT_STAMODE_DISCONNECTED:
         	Serial.println("Conexion WiFi: Desconetado");
         	break;
@@ -109,7 +109,7 @@ void MandaRespuesta(String comando, String payload) {
 }
 
 // Funcion ante un Evento de la libreria de comunicaciones
-void EventoComunicaciones (unsigned int Evento_Comunicaciones, char Info[300]){
+void EventoComunicaciones (unsigned int Evento_Comunicaciones, char Info[100]){
 
 	
 	switch (Evento_Comunicaciones)
@@ -189,18 +189,31 @@ void MandaTelemetria() {
 // Tarea para vigilar la conexion con el MQTT y conectar si no estamos conectados
 void TaskGestionRed () {
 
-		if (WiFi.isConnected() && !MisComunicaciones.IsConnected()){
-			
-			MisComunicaciones.Conectar();
-			
-		}
+	if (WiFi.isConnected()){
 		
+		if ( !MisComunicaciones.IsConnected() ){
+
+			MisComunicaciones.Conectar();
+
+		}
+
+		// Esto teoricamente se ejecuta en loop y solo actualiza en el tiempo que le damos al constructor, pero con esto es suficiente
+		ClienteNTP.update();
+		
+	}
+
+	else {
+
+		WiFi.reconnect();
+
+	}
+
 }
 
 //Tarea para procesar la cola de comandos recibidos
 void TaskProcesaComandos (){
 
-	char JSONmessageBuffer[300];
+	char JSONmessageBuffer[200];
 				
 			// Limpiar el Buffer
 			memset(JSONmessageBuffer, 0, sizeof JSONmessageBuffer);
@@ -316,6 +329,12 @@ void TaskProcesaComandos (){
 						
 						}
 
+						else if (PAYLOAD == "RECUERDA"){
+
+							MiPanic.Avisar(Panic::TipoCategoriaAviso::AVISO_RECORDATORIO);
+						
+						}
+
 					}
 
 					else if (COMANDO == "NAvisos"){
@@ -353,7 +372,7 @@ void TaskProcesaComandos (){
 // Tarea para procesar la telemetria recibida
 void TaskProcesaTelemetria(){
 
-			char JSONmessageBuffer[300];
+			char JSONmessageBuffer[200];
 				
 			// Limpiar el Buffer
 			memset(JSONmessageBuffer, 0, sizeof JSONmessageBuffer);
@@ -431,8 +450,8 @@ void TaskEnviaRespuestas(){
 					String MQTTT = ObjJson["MQTTT"].as<String>();
 					String RESP = ObjJson["RESP"].as<String>();
 					
-					char BufferTopic[100];
-					char BufferPayload[100];
+					char BufferTopic[75];
+					char BufferPayload[200];
 
 					strcpy(BufferTopic, MQTTT.c_str());
 					strcpy(BufferPayload, RESP.c_str());
@@ -570,12 +589,12 @@ void TaskMandaTelemetria(){
 
 // Definir aqui las tareas (no en SETUP como en FreeRTOS)
 
-Task TaskProcesaComandosHandler (100, TASK_FOREVER, &TaskProcesaComandos, &MiTaskScheduler, false);
+Task TaskProcesaComandosHandler (250, TASK_FOREVER, &TaskProcesaComandos, &MiTaskScheduler, false);
 Task TaskProcesaTelemetriaHandler (1000, TASK_FOREVER, &TaskProcesaTelemetria, &MiTaskScheduler, false);
-Task TaskEnviaRespuestasHandler (100, TASK_FOREVER, &TaskEnviaRespuestas, &MiTaskScheduler, false);
+Task TaskEnviaRespuestasHandler (250, TASK_FOREVER, &TaskEnviaRespuestas, &MiTaskScheduler, false);
 Task TaskPanicRunHandler (100, TASK_FOREVER, &TaskPanicRun, &MiTaskScheduler, false);
-Task TaskMandaTelemetriaHandler (5000, TASK_FOREVER, &TaskMandaTelemetria, &MiTaskScheduler, false);
-Task TaskComandosSerieRunHandler (100, TASK_FOREVER, &TaskComandosSerieRun, &MiTaskScheduler, false);
+Task TaskMandaTelemetriaHandler (10000, TASK_FOREVER, &TaskMandaTelemetria, &MiTaskScheduler, false);
+Task TaskComandosSerieRunHandler (250, TASK_FOREVER, &TaskComandosSerieRun, &MiTaskScheduler, false);
 Task TaskGestionRedHandler (30000, TASK_FOREVER, &TaskGestionRed, &MiTaskScheduler, false);	
 
 #pragma endregion

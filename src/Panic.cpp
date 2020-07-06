@@ -179,6 +179,13 @@ void Panic::Avisar(TipoCategoriaAviso t_CategoriaAviso){
 			LedBotonazo.Ciclo(200,200,8000,NAvisos);
 
 		break;
+
+		case AVISO_RECORDATORIO:
+
+			LedBotonazo.SetFrecuencia(800);
+			LedBotonazo.Pulsos(150,800,12);
+			
+		break;
 		
 		
 	}

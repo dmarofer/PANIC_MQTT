@@ -59,6 +59,7 @@ public:
 		AVISO_WARNING,
 		AVISO_EMERGENCIA,
 		AVISO_CUMPLE,
+		AVISO_RECORDATORIO,
 
 	}CategoriaAviso;
 
