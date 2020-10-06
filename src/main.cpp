@@ -32,8 +32,7 @@ Licencia: GNU General Public License v3.0 - https://www.gnu.org/licenses/gpl-3.0
 
 // Manejadores Colas para comunicaciones inter-tareas
 Queue ColaComandos(200, 10, IMPLEMENTATION);	// Cola para los comandos recibidos
-Queue ColaTelemetria(200, 10, IMPLEMENTATION);	// Cola para la telemetria recibida
-Queue ColaRespuestas(300, 20, IMPLEMENTATION);	// Cola para las respuestas a enviar
+Queue ColaTX(300, 20, IMPLEMENTATION);	// Cola para las respuestas a enviar
 
 // Flag para el estado del sistema de ficheros
 boolean SPIFFStatus = false;
@@ -69,9 +68,9 @@ void WiFiEventCallBack(WiFiEvent_t event) {
     	case WIFI_EVENT_STAMODE_GOT_IP:
      	   	Serial.print("Conexion WiFi: Conetado. IP: ");
       	  	Serial.println(WiFi.localIP());
+			MisComunicaciones.Conectar();
 			ArduinoOTA.begin();
 			Serial.println("Proceso OTA arrancado.");
-			MisComunicaciones.Conectar();
 			ClienteNTP.begin();
 			break;
     	case WIFI_EVENT_STAMODE_DISCONNECTED:
@@ -104,12 +103,13 @@ void MandaRespuesta(String comando, String payload) {
 	ObjJson.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
 	
 	// Mando el comando a la cola de comandos recibidos que luego procesara la tarea manejadordecomandos.
-	ColaRespuestas.push(&JSONmessageBuffer); 
+	ColaTX.push(JSONmessageBuffer); 
+	Serial.println(JSONmessageBuffer);
 
 }
 
 // Funcion ante un Evento de la libreria de comunicaciones
-void EventoComunicaciones (unsigned int Evento_Comunicaciones, char Info[100]){
+void EventoComunicaciones (unsigned int Evento_Comunicaciones, char Info[200]){
 
 	
 	switch (Evento_Comunicaciones)
@@ -125,7 +125,7 @@ void EventoComunicaciones (unsigned int Evento_Comunicaciones, char Info[100]){
 
 		Serial.print("MQTT - CONECTADO: ");
 		Serial.println(String(Info));
-		ClienteNTP.update();
+		//ClienteNTP.update();
 				
 	break;
 
@@ -137,30 +137,15 @@ void EventoComunicaciones (unsigned int Evento_Comunicaciones, char Info[100]){
 
 	break;
 
-	case Comunicaciones::EVENTO_TELE_RX:
-
-		//Serial.print("MQTT - TELE_RX: ");
-		//Serial.println(String(Info));
-		ColaTelemetria.push(Info);
-
-	break;
-
-	case Comunicaciones::EVENTO_DESCONECTADO:
-
-		
-
-	break;
-
 	default:
 	break;
 
 	}
 
-
 }
 
 // envia al topic tele la telemetria en Json
-void MandaTelemetria() {
+void CocinaTelemetria() {
 	
 
 	String t_topic = MiConfig.teleTopic + "/INFO1";
@@ -176,8 +161,7 @@ void MandaTelemetria() {
 	ObjJson.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
 	
 	// Mando el comando a la cola de comandos recibidos que luego procesara la tarea manejadordecomandos.
-	ColaRespuestas.push(&JSONmessageBuffer); 
-
+	ColaTX.push(&JSONmessageBuffer); 
 	
 }
 
@@ -369,67 +353,8 @@ void TaskProcesaComandos (){
 	
 }
 
-// Tarea para procesar la telemetria recibida
-void TaskProcesaTelemetria(){
-
-			char JSONmessageBuffer[200];
-				
-			// Limpiar el Buffer
-			memset(JSONmessageBuffer, 0, sizeof JSONmessageBuffer);
-
-			//if (xQueueReceive(ColaComandos,&JSONmessageBuffer,0) == pdTRUE ){
-			if (ColaTelemetria.pull(&JSONmessageBuffer)){
-
-				String COMANDO;
-				String PAYLOAD;
-				DynamicJsonBuffer jsonBuffer;
-				JsonObject& ObjJson = jsonBuffer.parseObject(JSONmessageBuffer);
-
-				if (ObjJson.success()) {
-				
-					COMANDO = ObjJson["COMANDO"].as<String>();
-					PAYLOAD = ObjJson["PAYLOAD"].as<String>();
-					
-					// Procesar los mensajes de Telemetria
-
-					if (COMANDO == "LWT"){
-												
-						if (PAYLOAD == "Online"){
-
-							
-						}
-
-						else {
-
-							
-						}
-
-
-					}
-
-					else {
-
-						//Serial.println("Me ha llegado un paquete de telemetria que no proceso.");
-						//Serial.println("Comando: " + COMANDO);
-						//Serial.println("Payload: " + PAYLOAD);
-
-					}
-
-				}
-
-				// Y si por lo que sea la libreria JSON no puede convertir el comando recibido
-				else {
-
-						Serial.println("La tarea de procesar telemetria ha recibido un paquete JSON mal formado.");
-						
-				}
-			
-			}
-
-}
-
 // Tarea para procesar la cola de respuestas
-void TaskEnviaRespuestas(){
+void TaskTX(){
 
 	
 	char JSONmessageBuffer[300];
@@ -437,7 +362,7 @@ void TaskEnviaRespuestas(){
 		// Limpiar el Buffer
 		memset(JSONmessageBuffer, 0, sizeof JSONmessageBuffer);
 
-		if (ColaRespuestas.pull(&JSONmessageBuffer)){
+		if (ColaTX.pull(&JSONmessageBuffer)){
 
 				DynamicJsonBuffer jsonBuffer;
 
@@ -568,20 +493,11 @@ void TaskComandosSerieRun(){
 	
 }
 
-// Tarea para el metodo run del objeto de la cupula.
-void TaskPanicRun(){
-
-
-		MiPanic.RunFast();
-
-
-}
-
 // tarea para el envio periodico de la telemetria
-void TaskMandaTelemetria(){
+void TaskCocinaTelemetria(){
 
 		
-		MandaTelemetria();
+		CocinaTelemetria();
 		
 	
 }
@@ -590,12 +506,10 @@ void TaskMandaTelemetria(){
 // Definir aqui las tareas (no en SETUP como en FreeRTOS)
 
 Task TaskProcesaComandosHandler (250, TASK_FOREVER, &TaskProcesaComandos, &MiTaskScheduler, false);
-Task TaskProcesaTelemetriaHandler (1000, TASK_FOREVER, &TaskProcesaTelemetria, &MiTaskScheduler, false);
-Task TaskEnviaRespuestasHandler (250, TASK_FOREVER, &TaskEnviaRespuestas, &MiTaskScheduler, false);
-Task TaskPanicRunHandler (100, TASK_FOREVER, &TaskPanicRun, &MiTaskScheduler, false);
-Task TaskMandaTelemetriaHandler (10000, TASK_FOREVER, &TaskMandaTelemetria, &MiTaskScheduler, false);
+Task TaskTXHandler (250, TASK_FOREVER, &TaskTX, &MiTaskScheduler, false);
+Task TaskCocinaTelemetriaHandler (10000, TASK_FOREVER, &TaskCocinaTelemetria, &MiTaskScheduler, false);
 Task TaskComandosSerieRunHandler (250, TASK_FOREVER, &TaskComandosSerieRun, &MiTaskScheduler, false);
-Task TaskGestionRedHandler (30000, TASK_FOREVER, &TaskGestionRed, &MiTaskScheduler, false);	
+Task TaskGestionRedHandler (10000, TASK_FOREVER, &TaskGestionRed, &MiTaskScheduler, false);	
 
 #pragma endregion
 
@@ -613,14 +527,6 @@ void setup() {
 	// Asignar funciones Callback
 	MiPanic.SetRespondeComandoCallback(MandaRespuesta);
 		
-	// Comunicaciones
-	
-	WiFi.onEvent(WiFiEventCallBack);
-	
-	// Iniciar la Wifi
-	WiFi.begin();
-	
-
 	// Iniciar el sistema de ficheros
 	SPIFFStatus = SPIFFS.begin();
 
@@ -656,19 +562,20 @@ void setup() {
 	MisComunicaciones.SetMqttClientId(MiConfig.mqtttopic);
 	MisComunicaciones.SetMqttTopic(MiConfig.mqtttopic);
 
+	// Iniciar la Wifi
+	WiFi.onEvent(WiFiEventCallBack);
+	WiFi.begin();
+	
 	// TASKS
 	Serial.println("Habilitando tareas del sistema.");
 		
 	TaskProcesaComandosHandler.enable();
-	TaskProcesaTelemetriaHandler.enable();
-	TaskEnviaRespuestasHandler.enable();
-	TaskPanicRunHandler.enable();
-	TaskMandaTelemetriaHandler.enable();
+	TaskTXHandler.enable();
+	TaskCocinaTelemetriaHandler.enable();
 	TaskComandosSerieRunHandler.enable();
 	
 	// Init Completado.
 	Serial.println("Funcion Setup Completada - Tareas Scheduler y loop en marcha");
-
 	MiPanic.Avisar(Panic::TipoCategoriaAviso::AVISO_INICIO);
 	
 }
@@ -683,8 +590,8 @@ void setup() {
 void loop() {
 
 	ArduinoOTA.handle();
-	MiPanic.RunFast();
 	MiTaskScheduler.execute();
+	MiPanic.RunFast();
 	MisComunicaciones.RunFast();
 
 }

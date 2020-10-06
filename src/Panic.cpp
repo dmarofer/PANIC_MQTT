@@ -10,6 +10,7 @@
 #include <Pulsador.h>
 
 Pulsador Botonazo (PINPULSADOR, INPUT, DEBOUNCEBOTONAZO, HOLDTIMEBOTONAZO, false);
+//Pulsador Botonazo (PINPULSADOR, INPUT_PULLUP, DEBOUNCEBOTONAZO, HOLDTIMEBOTONAZO, true);
 IndicadorLed LedBotonazo(PINLED, false, PINBUZZER);
 
 Panic::Panic(String fich_config_Panic, NTPClient& ClienteNTP) : ClienteNTP(ClienteNTP) {
@@ -19,7 +20,6 @@ Panic::Panic(String fich_config_Panic, NTPClient& ClienteNTP) : ClienteNTP(Clien
 	mificheroconfig = fich_config_Panic;
 	CategoriaAviso = Panic::AVISO_INICIO;
 	BootTime = "NA";
-	   	
 
 }
 
@@ -44,11 +44,12 @@ String Panic::MiEstadoJson(int categoria) {
 	case 1:
 
 		// Esto llena de objetos de tipo "pareja propiedad valor"
+		jObj.set("HI", HardwareInfo);									// Info del Hardware
+		jObj.set("FH", ESP.getFreeHeap());								// Heap Libre
 		jObj.set("TIME", ClienteNTP.getFormattedTime());				// HORA
 		jObj.set("BOOT", BootTime);										// HORA de arranque del sistema
-		jObj.set("HI", HardwareInfo);									// Info del Hardware
 		jObj.set("UPT", t_uptime);										// Uptime en segundos
-		jObj.set("SWITCH", Botonazo.LeeEstado());						// Info de la conexion WIFI y MQTT
+		//jObj.set("SWITCH", Botonazo.LeeEstado());						// Info de la conexion WIFI y MQTT
 		jObj.set("RC", rtc_info->reason);								// Reset Cause (0=POWER ON, 1=WTD reset, 4=SOFTWARE RESET, 6=BOTON RESET, )
 		jObj.set("RR", ESP.getResetReason());							// Reset Reason
 
@@ -105,6 +106,8 @@ boolean Panic::SalvaConfig(){
 
 boolean Panic::LeeConfig(){
 
+	Botonazo.SetCallbackEventos(std::bind(&Panic::Eventos_Boton, this, std::placeholders::_1));
+
 	// Sacar del fichero de configuracion, si existe, las configuraciones permanentes
 	if (SPIFFS.exists(mificheroconfig)) {
 
@@ -152,22 +155,19 @@ void Panic::Avisar(TipoCategoriaAviso t_CategoriaAviso){
 
 		case AVISO_INICIO:
 
-			LedBotonazo.SetFrecuencia(1000);
-			LedBotonazo.Pulsos(50,50,2);
+			LedBotonazo.Pulsos(50,50,2,1000);
 									
 		break;
 		
 		case AVISO_WARNING:
 
-			LedBotonazo.SetFrecuencia(300);
-			LedBotonazo.Pulsos(500,500,3);
+			LedBotonazo.Pulsos(500,500,3,300);
 
 		break;
 		
 		case AVISO_EMERGENCIA:
 
-			LedBotonazo.SetFrecuencia(300);
-			LedBotonazo.Pulsos(200,200,15);
+			LedBotonazo.Pulsos(200,200,15,300);
 
 		break;
 
@@ -182,8 +182,8 @@ void Panic::Avisar(TipoCategoriaAviso t_CategoriaAviso){
 
 		case AVISO_RECORDATORIO:
 
-			LedBotonazo.SetFrecuencia(800);
-			LedBotonazo.Pulsos(150,800,12);
+			LedBotonazo.Pulsos(150,800,6,800);
+			//LedBotonazo.Pulsos(1000,800,1,800);
 			
 		break;
 		
@@ -256,27 +256,39 @@ void Panic::SetNAvisos(int l_NAvisos){
 
 }
 
+void Panic::Eventos_Boton (unsigned int l_Evento_Pulsador){
+
+	switch (l_Evento_Pulsador){
+
+		case Pulsador::PUL_PULSACION_SIMPLE:
+			
+			this->Avisar(Panic::AVISO_EMERGENCIA);
+			this->MiRespondeComandos("SWITCH","PULSADO");
+						
+		break;
+
+		case Pulsador::PUL_HOLD:
+			
+			this->Avisar(Panic::AVISO_CUMPLE);
+			this->MiRespondeComandos("SWITCH","HOLD");
+						
+		break;
+				
+		default:
+		break;
+	
+	}
+
+
+}
+
 // Esta funcion se lanza desde una Task y hace las "cosas periodicas de la clase". No debe atrancarse nunca tampoco por supuesto (ni esta ni ninguna)
 void Panic::RunFast() {
 	
-	// UpTime Minutos
-	t_uptime = 0;
 	LedBotonazo.RunFast();
 	Botonazo.Run();
 
-	switch (Botonazo.LeeEstado())
-	{
-	case Pulsador::EDB_PULSADO:
-		
-		this->Avisar(Panic::AVISO_EMERGENCIA);
-		this->MiRespondeComandos("SWITCH", "1");
-
-	break;
 	
-	default:
-	break;
-	
-	}
 	
 	if (HayQueSalvar){
 

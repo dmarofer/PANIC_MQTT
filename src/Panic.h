@@ -4,10 +4,8 @@
 #include <NTPClient.h>					// Para la gestion de la hora por NTP
 #include <WiFiUdp.h>					// Para la conexion UDP con los servidores de hora.
 
-
 class Panic
 {
-
 
 
 private:
@@ -19,6 +17,9 @@ private:
 
     typedef void(*RespondeComandoCallback)(String comando, String respuesta);			// Definir como ha de ser la funcion de Callback (que le tengo que pasar y que devuelve)
 	RespondeComandoCallback MiRespondeComandos = nullptr;								// Definir el objeto que va a contener la funcion que vendra de fuera AQUI en la clase.
+
+	void Eventos_Boton (unsigned int l_Evento_Pulsador);					        	// Funcion mia de callback para eventos del pulsador
+
 
 	// Para almacenar Alias (referencia) al objeto tipo NTPClient para poder usar en la clase el que viene del Main
     NTPClient &ClienteNTP;
