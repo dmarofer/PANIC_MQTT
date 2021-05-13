@@ -31,8 +31,8 @@ Licencia: GNU General Public License v3.0 - https://www.gnu.org/licenses/gpl-3.0
 #pragma region Objetos
 
 // Manejadores Colas para comunicaciones inter-tareas
-Queue ColaComandos(200, 10, IMPLEMENTATION);	// Cola para los comandos recibidos
-Queue ColaTX(300, 20, IMPLEMENTATION);	// Cola para las respuestas a enviar
+cppQueue ColaComandos(200, 10, IMPLEMENTATION);	// Cola para los comandos recibidos
+cppQueue ColaTX(300, 20, IMPLEMENTATION);	// Cola para las respuestas a enviar
 
 // Flag para el estado del sistema de ficheros
 boolean SPIFFStatus = false;
